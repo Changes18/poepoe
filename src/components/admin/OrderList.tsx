@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios, { AxiosError } from "axios"; // Импортируем AxiosError
+import axios, { AxiosError } from "axios";
 import { toast } from "react-toastify";
 import OrderModal from "./OrderModal";
 
@@ -41,14 +41,14 @@ export default function OrderList({ token, setError }: OrderListProps) {
     const fetchOrders = async () => {
       try {
         const response = await axios.get<Order[]>(
-          "http://localhost:3001/orders",
+          "https://poepoe.vercel.app/api/orders",
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
         setOrders(response.data);
       } catch (err) {
-        const error = err as AxiosError; // Явно указываем тип ошибки
+        const error = err as AxiosError;
         console.error("Ошибка при загрузке заказов:", error);
         setError(
           error.response?.status === 404
@@ -68,7 +68,7 @@ export default function OrderList({ token, setError }: OrderListProps) {
 
     try {
       const response = await axios.put<OrderResponse>(
-        `http://localhost:3001/orders/${selectedOrder._id}`,
+        `https://poepoe.vercel.app/api/orders/${selectedOrder._id}`,
         { status: editData.status || selectedOrder.status },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -91,7 +91,7 @@ export default function OrderList({ token, setError }: OrderListProps) {
     if (!window.confirm("Вы уверены, что хотите удалить этот заказ?")) return;
 
     try {
-      await axios.delete(`http://localhost:3001/orders/${id}`, {
+      await axios.delete(`https://poepoe.vercel.app/api/orders/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(orders.filter((order) => order._id !== id));
