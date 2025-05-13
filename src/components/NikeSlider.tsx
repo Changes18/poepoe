@@ -40,10 +40,10 @@ export default function NikeSlider() {
   }, [slider]);
 
   return (
-    <div className="relative">
+    <div className="relative w-full h-">
       <div
         ref={sliderRef}
-        className="keen-slider overflow-hidden shadow-2xl w-7xl"
+        className="keen-slider overflow-hidden shadow-2xl h-[610px]"
       >
         {slides.map((slide, index) => (
           <div
