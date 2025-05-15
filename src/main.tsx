@@ -12,6 +12,7 @@ import Page from "./Pages/Catalog.tsx";
 import Footer from "./components/Footer.tsx";
 import AdminPanel from "./Pages/AdminPanel.tsx";
 import Basket from "./Pages/Basket.tsx";
+import CheckOut from "./Pages/CheckOut.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -26,6 +27,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/ft" element={<Footer />} />
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/bask" element={<Basket />} />
+        <Route path="/check" element={<CheckOut />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>

@@ -234,7 +234,10 @@ const Basket: React.FC = () => {
 
             <div className="text-right mt-6">
               <p className="text-xl font-bold">Итого: {totalPrice} $</p>
-              <button className="mt-2 px-4 py-2 bg-black text-white rounded hover:bg-gray-800">
+              <button
+                onClick={() => navigate("/check")}
+                className="mt-2 px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
+              >
                 Перейти к оформлению
               </button>
             </div>

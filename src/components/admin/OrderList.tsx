@@ -1,20 +1,28 @@
-import { useEffect, useState } from "react";
-import axios, { AxiosError } from "axios";
+import { useState, useEffect } from "react";
+import { Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
-import OrderModal from "./OrderModal";
 
-interface Product {
-  _id: string;
+interface OrderItem {
+  productId: string;
   name: string;
+  quantity: number;
   price: number;
-  image: string;
-  description: string;
 }
 
 interface Order {
   _id: string;
   user: { _id: string; username: string };
-  products: { product: Product; quantity: number }[];
+  customer: {
+    firstName: string;
+    lastName: string;
+    address: string;
+    postalCode: string;
+    city: string;
+    email: string;
+    phone: string;
+    paymentMethod: string;
+  };
+  items: OrderItem[];
   total: number;
   status: string;
   createdAt: string;
@@ -25,176 +33,162 @@ interface OrderListProps {
   setError: (error: string | null) => void;
 }
 
-interface OrderResponse {
-  message: string;
-  order: Order;
-}
-
 export default function OrderList({ token, setError }: OrderListProps) {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [editData, setEditData] = useState<Partial<Order>>({});
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!token) return;
+
     const fetchOrders = async () => {
       try {
-        const response = await axios.get<Order[]>(
-          "https://poepoe.vercel.app/api/orders",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setOrders(response.data);
+        const response = await fetch("http://localhost:3001/orders", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("auth");
+          localStorage.removeItem("user");
+          setError("Сессия истекла. Пожалуйста, войдите заново.");
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Ошибка при загрузке заказов");
+        }
+
+        const data = await response.json();
+        setOrders(data);
+        setLoading(false);
       } catch (err) {
-        const error = err as AxiosError;
-        console.error("Ошибка при загрузке заказов:", error);
-        setError(
-          error.response?.status === 404
-            ? "Request failed with status code 404"
-            : "Неизвестная ошибка"
-        );
+        setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+        setLoading(false);
       }
     };
 
-    if (token) {
-      fetchOrders();
-    }
+    fetchOrders();
   }, [token, setError]);
 
-  const handleEditOrderSave = async () => {
-    if (!selectedOrder) return;
-
-    try {
-      const response = await axios.put<OrderResponse>(
-        `https://poepoe.vercel.app/api/orders/${selectedOrder._id}`,
-        { status: editData.status || selectedOrder.status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setOrders(
-        orders.map((order) =>
-          order._id === selectedOrder._id ? response.data.order : order
-        )
-      );
-      setSelectedOrder(null);
-      toast.success("Заказ обновлен!");
-    } catch (err) {
-      const error = err as AxiosError;
-      console.error("Ошибка при обновлении заказа:", error);
-      setError("Ошибка при обновлении заказа");
-    }
-  };
-
   const handleDeleteOrder = async (id: string) => {
-    if (!window.confirm("Вы уверены, что хотите удалить этот заказ?")) return;
-
     try {
-      await axios.delete(`https://poepoe.vercel.app/api/orders/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await fetch(`http://localhost:3001/orders/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
+      if (response.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("auth");
+        localStorage.removeItem("user");
+        setError("Сессия истекла. Пожалуйста, войдите заново.");
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Ошибка при удалении заказа");
+      }
+
       setOrders(orders.filter((order) => order._id !== id));
-      toast.success("Заказ удален!");
+      toast.success("Заказ удален!", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: true,
+        theme: "light",
+      });
     } catch (err) {
-      const error = err as AxiosError;
-      console.error("Ошибка при удалении заказа:", error);
-      setError("Ошибка при удалении заказа");
+      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+      toast.error(err instanceof Error ? err.message : "Неизвестная ошибка", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: true,
+        theme: "light",
+      });
     }
   };
 
-  const filteredOrders = orders
-    .filter((order) =>
-      order.user.username.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .filter((order) => (statusFilter ? order.status === statusFilter : true));
+  if (loading) {
+    return <div className="text-gray-500">Загрузка заказов...</div>;
+  }
+
+  if (orders.length === 0) {
+    return <div className="text-gray-500">Заказы отсутствуют</div>;
+  }
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm">
-      <h2 className="text-base font-medium text-gray-700 mb-3">Заказы</h2>
-
-      <div className="mb-4 flex gap-4">
-        <input
-          type="text"
-          placeholder="Поиск по имени пользователя..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full max-w-xs border border-gray-200 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-200 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold text-gray-800">Список заказов</h2>
+      {orders.map((order) => (
+        <div
+          key={order._id}
+          className="relative bg-white p-4 rounded-lg shadow-md border border-gray-200"
         >
-          <option value="">Все статусы</option>
-          <option value="pending">Ожидает</option>
-          <option value="processing">В обработке</option>
-          <option value="completed">Завершен</option>
-          <option value="cancelled">Отменен</option>
-        </select>
-      </div>
-
-      {filteredOrders.length === 0 ? (
-        <p className="text-gray-500 text-sm">Нет заказов</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-gray-600">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-              <tr>
-                <th className="py-3 px-6">ID заказа</th>
-                <th className="py-3 px-6">Пользователь</th>
-                <th className="py-3 px-6">Сумма</th>
-                <th className="py-3 px-6">Статус</th>
-                <th className="py-3 px-6">Дата</th>
-                <th className="py-3 px-6">Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr
-                  key={order._id}
-                  className="bg-white border-b hover:bg-gray-50"
-                >
-                  <td className="py-4 px-6">{order._id.slice(0, 8)}</td>
-                  <td className="py-4 px-6">{order.user.username}</td>
-                  <td className="py-4 px-6">${order.total}</td>
-                  <td className="py-4 px-6">{order.status}</td>
-                  <td className="py-4 px-6">
-                    {new Date(order.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="py-4 px-6 flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setEditData({ status: order.status });
-                      }}
-                      className="text-blue-600 hover:underline"
-                    >
-                      Редактировать
-                    </button>
-                    <button
-                      onClick={() => handleDeleteOrder(order._id)}
-                      className="text-red-600 hover:underline"
-                    >
-                      Удалить
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="flex justify-between mb-2">
+            <p className="text-sm font-medium text-gray-900">
+              Заказ #{order._id.slice(-6)}
+            </p>
+            <p className="text-sm text-gray-600">
+              {new Date(order.createdAt).toLocaleDateString("ru-RU")}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+            <div>
+              <p className="text-sm font-medium text-gray-700">
+                Клиент: {order.customer.firstName} {order.customer.lastName}
+              </p>
+              <p className="text-sm text-gray-600">
+                Email: {order.customer.email}
+              </p>
+              <p className="text-sm text-gray-600">
+                Телефон: {order.customer.phone}
+              </p>
+              <p className="text-sm text-gray-600">
+                Пользователь: {order.user?.username || "Неизвестно"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">
+                Адрес: {order.customer.address}, {order.customer.city},{" "}
+                {order.customer.postalCode}
+              </p>
+              <p className="text-sm text-gray-600">
+                Способ оплаты: {order.customer.paymentMethod}
+              </p>
+              <p className="text-sm text-gray-600">Статус: {order.status}</p>
+            </div>
+          </div>
+          <div className="mb-2">
+            <p className="text-sm font-medium text-gray-700">Товары:</p>
+            {order.items.map((item, index) => (
+              <div
+                key={index}
+                className="flex justify-between text-sm text-gray-600"
+              >
+                <p>
+                  {item.name} (x{item.quantity})
+                </p>
+                <p>{(item.price * item.quantity).toLocaleString("ru-RU")} ₽</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-sm font-bold text-gray-900">
+            <p>Итого:</p>
+            <p>{order.total.toLocaleString("ru-RU")} ₽</p>
+          </div>
+          <button
+            onClick={() => handleDeleteOrder(order._id)}
+            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-sm hover:bg-gray-100"
+          >
+            <Trash2 className="w-4 h-4 text-red-600" />
+          </button>
         </div>
-      )}
-
-      {selectedOrder && (
-        <OrderModal
-          order={selectedOrder}
-          editData={editData}
-          setEditData={setEditData}
-          onSave={handleEditOrderSave}
-          onClose={() => setSelectedOrder(null)}
-        />
-      )}
+      ))}
     </div>
   );
 }

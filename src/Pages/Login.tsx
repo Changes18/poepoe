@@ -1,54 +1,81 @@
-import { useState } from "react";
-import axios from "axios";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-interface LoginProps {
-  setToken: (token: string) => void;
-  setError: (error: string | null) => void;
-}
-
-export default function Login({ setToken, setError }: LoginProps) {
-  const [username, setUsername] = useState("");
+export default function Login() {
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const response = await axios.post("https://poepoe.vercel.app/api/login", {
-        username,
-        password,
+      const response = await fetch("http://localhost:3001/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: login, password }),
       });
-      setToken(response.data.token);
-      localStorage.setItem("token", response.data.token);
-      alert(response.data.message);
-      setError(null);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Ошибка при входе");
+      }
+
+      const data = await response.json();
+      console.log("Login response:", data); // Для отладки
+      localStorage.setItem("auth", "true");
+      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);
+      navigate("/");
     } catch (err) {
-      console.error("Ошибка входа:", err);
-      setError("Не удалось войти");
+      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
     }
   };
-
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-medium mb-4">Вход</h2>
-      <input
-        type="text"
-        placeholder="Имя пользователя"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <input
-        type="password"
-        placeholder="Пароль"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <button
-        onClick={handleLogin}
-        className="bg-blue-500 text-white p-2 rounded"
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white p-8 rounded-md w-80 text-center shadow-md"
       >
-        Войти
-      </button>
+        <h1 className="mb-2 font-bold text-black">Вход</h1>
+
+        <input
+          value={login}
+          required
+          onChange={(e) => setLogin(e.target.value)}
+          placeholder="Логин"
+          type="text"
+          className="my-1 p-2 w-full rounded border focus:outline"
+        />
+
+        <input
+          value={password}
+          required
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Пароль"
+          type="password"
+          className="my-1 p-2 w-full rounded border focus:outline"
+        />
+
+        {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+
+        <button
+          type="submit"
+          className="items-center text-center bg-gray-700 p-2 rounded text-white my-3 py-2 w-full"
+        >
+          Войти
+        </button>
+
+        <div className="flex justify-center gap-1 text-sm">
+          <h3>Нет аккаунта?</h3>
+          <span
+            onClick={() => navigate("/register")}
+            className="cursor-pointer text-blue-700 hover:underline"
+          >
+            Зарегистрируйся
+          </span>
+        </div>
+      </form>
     </div>
   );
 }

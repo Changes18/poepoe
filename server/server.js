@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import User from "./models/User.js";
 import Product from "./models/Product.js";
 import CartItem from "./models/CartItem.js";
-import Order from "./models/Order.js"; // Добавлен импорт модели Order
+import Order from "./models/Order.js";
 
 const app = express();
 app.use(express.json());
@@ -17,8 +17,7 @@ mongoose
   .then(() => console.log("✅ Подключено к MongoDB"))
   .catch((err) => console.error("❌ Ошибка подключения к MongoDB:", err));
 
-const JWT_SECRET =
-  "QEHZXugWPCkJWGbbVJoT2HfKYWOuiBlY7azFa9VXdCRAuevOR3AokzXjYX6oQkoV";
+const JWT_SECRET = "pXT3UQ9xhdEXSQe3UXgQUaumsJzxcf10gGSVf5xZ51rVPYu6ha";
 
 // Middleware для проверки JWT
 const authenticateUser = async (req, res, next) => {
@@ -109,7 +108,7 @@ app.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "24h",
     });
 
     res.json({
@@ -359,12 +358,92 @@ app.delete("/cart", authenticateUser, async (req, res) => {
   }
 });
 
+// 📦 Создание заказа
+app.post("/orders", authenticateUser, async (req, res) => {
+  try {
+    const {
+      customer: {
+        firstName,
+        lastName,
+        address,
+        postalCode,
+        city,
+        email,
+        phone,
+        paymentMethod,
+      },
+      items,
+    } = req.body;
+
+    // Валидация входных данных
+    if (
+      !firstName ||
+      !lastName ||
+      !address ||
+      !postalCode ||
+      !city ||
+      !email ||
+      !phone ||
+      !paymentMethod ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res.status(400).json({ message: "Некорректные данные заказа" });
+    }
+
+    // Проверка товаров
+    let total = 0;
+    const orderItems = [];
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product) {
+        return res
+          .status(404)
+          .json({ message: `Товар ${item.productId} не найден` });
+      }
+      const itemTotal = product.price * item.quantity;
+      total += itemTotal;
+      orderItems.push({
+        productId: product._id,
+        name: product.name,
+        quantity: item.quantity,
+        price: product.price,
+      });
+    }
+
+    // Создание заказа
+    const newOrder = new Order({
+      user: req.user._id,
+      customer: {
+        firstName,
+        lastName,
+        address,
+        postalCode,
+        city,
+        email,
+        phone,
+        paymentMethod,
+      },
+      items: orderItems,
+      total,
+      status: "pending",
+    });
+
+    await newOrder.save();
+    res.json({ message: "Заказ успешно создан", order: newOrder });
+  } catch (err) {
+    console.error("Ошибка при создании заказа:", err);
+    res.status(500).json({ message: "Ошибка сервера при создании заказа" });
+  }
+});
+
 // 📦 Получение всех заказов (только для admin)
 app.get("/orders", authenticateAdmin, async (req, res) => {
   try {
     const orders = await Order.find()
       .populate("user", "username")
-      .populate("products.product");
+      .populate("items.productId");
     res.json(orders);
   } catch (err) {
     console.error("Ошибка при получении заказов:", err);
@@ -372,46 +451,15 @@ app.get("/orders", authenticateAdmin, async (req, res) => {
   }
 });
 
-// 📦 Обновление статуса заказа (только для admin)
-app.put("/orders/:id", authenticateAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Неверный формат id" });
-    }
-
-    const order = await Order.findById(id);
-    if (!order) {
-      return res.status(404).json({ message: "Заказ не найден" });
-    }
-
-    order.status = status;
-    await order.save();
-
-    res.json({ message: "Заказ обновлен", order });
-  } catch (err) {
-    console.error("Ошибка при обновлении заказа:", err);
-    res.status(500).json({ message: "Ошибка сервера при обновлении заказа" });
-  }
-});
-
 // 📦 Удаление заказа (только для admin)
 app.delete("/orders/:id", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Неверный формат id" });
-    }
-
-    const order = await Order.findByIdAndDelete(id);
-    if (!order) {
+    const deletedOrder = await Order.findByIdAndDelete(id);
+    if (!deletedOrder) {
       return res.status(404).json({ message: "Заказ не найден" });
     }
-
-    res.json({ message: "Заказ удален" });
+    res.json({ message: "Заказ успешно удален" });
   } catch (err) {
     console.error("Ошибка при удалении заказа:", err);
     res.status(500).json({ message: "Ошибка сервера при удалении заказа" });

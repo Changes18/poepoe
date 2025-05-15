@@ -1,64 +1,80 @@
 import { useState } from "react";
-import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
-interface RegisterProps {
-  setError: (error: string | null) => void;
-}
-
-export default function Register({ setError }: RegisterProps) {
-  const [username, setUsername] = useState("");
+export default function Register() {
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const handleRegister = async () => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     try {
-      const response = await axios.post(
-        "https://poepoe.vercel.app/api/register",
-        {
-          username,
-          password,
-          role,
-        }
-      );
-      alert(response.data.message);
-      setError(null);
+      const response = await fetch("http://localhost:3001/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: login, password, role: "user" }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        navigate("/login");
+      } else {
+        setError(data.message || "Ошибка при регистрации");
+      }
     } catch (err) {
-      console.error("Ошибка регистрации:", err);
-      setError("Не удалось зарегистрироваться");
+      console.error("Ошибка:", err);
+      setError("Не удалось подключиться к серверу");
     }
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-medium mb-4">Регистрация</h2>
-      <input
-        type="text"
-        placeholder="Имя пользователя"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <input
-        type="password"
-        placeholder="Пароль"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className="border p-2 mb-2 w-full"
-      />
-      <select
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        className="border p-2 mb-2 w-full"
+    <div className="flex items-center justify-center h-screen bg-gray-100">
+      <form
+        onSubmit={handleRegister}
+        className="bg-white p-8 rounded-md w-80 text-center shadow-md"
       >
-        <option value="user">Пользователь</option>
-        <option value="admin">Админ</option>
-      </select>
-      <button
-        onClick={handleRegister}
-        className="bg-blue-500 text-white p-2 rounded"
-      >
-        Зарегистрироваться
-      </button>
+        <h1 className="mb-2 font-bold text-black">Регистрация</h1>
+
+        <input
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
+          required
+          placeholder="Логин"
+          type="text"
+          className="my-1 p-2 w-full rounded border focus:outline"
+        />
+
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="Пароль"
+          type="password"
+          className="my-1 p-2 w-full rounded border focus:outline"
+        />
+
+        {error && <p className="text-red-500 text-sm font-medium">{error}</p>}
+
+        <button
+          type="submit"
+          className="items-center text-center bg-gray-700 p-2 rounded text-white my-3 py-2 w-full"
+        >
+          Зарегистрироваться
+        </button>
+
+        <div className="flex justify-center gap-1 text-sm">
+          <h3>Есть аккаунт?</h3>
+          <span
+            onClick={() => navigate("/login")}
+            className="cursor-pointer text-blue-700 hover:underline"
+          >
+            Войти
+          </span>
+        </div>
+      </form>
     </div>
   );
 }
